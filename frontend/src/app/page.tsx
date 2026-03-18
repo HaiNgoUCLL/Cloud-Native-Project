@@ -8,7 +8,7 @@ import api from '@/lib/axios';
 import { Restaurant } from '@/types';
 import { SkeletonCard, LoadingSpinner } from '@/components/LoadingSpinner';
 
-const CUISINES = ['All', 'Italian', 'Japanese', 'American', 'Mexican', 'Chinese', 'Indian', 'Thai'];
+const CUISINES = ['All', 'Italian', 'Japanese', 'American', 'Mexican', 'Indian', 'Thai', 'French', 'Mediterranean', 'Brazilian', 'Korean', 'Vegan'];
 
 export default function HomePage() {
   return (
