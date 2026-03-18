@@ -80,8 +80,43 @@ export interface Order {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   driverId: string;
+  promoCode: string | null;
+  discountAmount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  minimumOrderAmount: number;
+  maxUsageCount: number;
+  currentUsageCount: number;
+  expiresAt: string | null;
+  active: boolean;
+  restaurantId: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PromoValidationResponse {
+  valid: boolean;
+  discountAmount: number;
+  message: string;
+}
+
+export interface Review {
+  id: string;
+  customerId: string;
+  customerName: string;
+  restaurantId: string;
+  orderId: string;
+  rating: number;
+  comment: string;
+  sentimentScore: number | null;
+  createdAt: string;
 }
 
 export interface ApiResponse<T> {

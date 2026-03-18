@@ -2,6 +2,7 @@ package com.foodplatform.service;
 
 import com.foodplatform.dto.OrderRequest;
 import com.foodplatform.model.Cart;
+import com.foodplatform.model.NotificationEvent;
 import com.foodplatform.model.Order;
 import com.foodplatform.model.Restaurant;
 import com.foodplatform.model.User;
@@ -24,6 +25,9 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final RestaurantRepository restaurantRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final PromoCodeService promoCodeService;
+    private final CartService cartService;
 
     public Order placeOrder(String customerId, OrderRequest request) {
         Cart cart = cartRepository.findByCustomerId(customerId)
@@ -41,12 +45,28 @@ public class OrderService {
                 .map(ci -> new Order.OrderItem(ci.getMenuItemId(), ci.getName(), ci.getPrice(), ci.getQuantity()))
                 .collect(Collectors.toList());
 
+        double discountAmount = 0;
+        String appliedPromo = null;
+        if (request.getPromoCode() != null && !request.getPromoCode().isEmpty()) {
+            var validation = promoCodeService.validatePromoCode(
+                    request.getPromoCode(), totalAmount, cart.getRestaurantId());
+            if (validation.isValid()) {
+                discountAmount = validation.getDiscountAmount();
+                appliedPromo = request.getPromoCode().toUpperCase();
+                promoCodeService.applyPromoCode(appliedPromo);
+            } else {
+                throw new RuntimeException(validation.getMessage());
+            }
+        }
+
         Order order = new Order();
         order.setCustomerId(customerId);
         order.setRestaurantId(cart.getRestaurantId());
         order.setItems(orderItems);
         order.setStatus(Order.OrderStatus.PENDING);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(totalAmount - discountAmount);
+        order.setPromoCode(appliedPromo);
+        order.setDiscountAmount(discountAmount);
         order.setDeliveryAddress(request.getDeliveryAddress());
         order.setPaymentStatus(Order.PaymentStatus.PENDING);
         order.setPaymentMethod(request.getPaymentMethod());
@@ -56,6 +76,12 @@ public class OrderService {
         Order savedOrder = orderRepository.save(order);
 
         cartRepository.deleteByCustomerId(customerId);
+
+        // Notify restaurant owner of new order
+        restaurantRepository.findById(savedOrder.getRestaurantId()).ifPresent(restaurant ->
+            notificationService.sendNotification(restaurant.getOwnerId(),
+                NotificationEvent.newOrder(savedOrder.getId(), "New order #" + savedOrder.getId().substring(savedOrder.getId().length() - 6)))
+        );
 
         return savedOrder;
     }
@@ -113,7 +139,22 @@ public class OrderService {
 
         order.setStatus(newStatus);
         order.setUpdatedAt(LocalDateTime.now());
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+
+        // Notify customer of status change
+        String statusText = newStatus.name().replace('_', ' ').toLowerCase();
+        notificationService.sendNotification(saved.getCustomerId(),
+            NotificationEvent.orderStatusChanged(saved.getId(), "Your order is now " + statusText));
+
+        // If driver picked up, also notify restaurant owner
+        if (newStatus == Order.OrderStatus.OUT_FOR_DELIVERY) {
+            restaurantRepository.findById(saved.getRestaurantId()).ifPresent(restaurant ->
+                notificationService.sendNotification(restaurant.getOwnerId(),
+                    NotificationEvent.orderAssigned(saved.getId(), "Order #" + saved.getId().substring(saved.getId().length() - 6) + " picked up by driver"))
+            );
+        }
+
+        return saved;
     }
 
     public Order simulatePayment(String orderId, String customerId) {
@@ -144,5 +185,21 @@ public class OrderService {
 
     public List<Order> getAllOrders() {
         return orderRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    public Cart reorder(String orderId, String customerId) {
+        Order order = getOrderById(orderId);
+        if (!order.getCustomerId().equals(customerId)) {
+            throw new RuntimeException("Not your order");
+        }
+
+        Restaurant restaurant = restaurantRepository.findById(order.getRestaurantId())
+                .orElseThrow(() -> new RuntimeException("Restaurant no longer exists"));
+
+        if (!restaurant.isOpen()) {
+            throw new RuntimeException("Restaurant is currently closed");
+        }
+
+        return cartService.populateFromOrder(customerId, order);
     }
 }

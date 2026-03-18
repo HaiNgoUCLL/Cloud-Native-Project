@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Star, MapPin, Plus } from 'lucide-react';
+import { Star, MapPin, Plus, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/axios';
-import { Restaurant, MenuItem } from '@/types';
+import { Restaurant, MenuItem, Review } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useCartStore } from '@/lib/cartStore';
 import { LoadingSpinner, SkeletonMenuItem } from '@/components/LoadingSpinner';
@@ -18,6 +18,8 @@ export default function RestaurantPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>('');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [activeTab, setActiveTab] = useState<'menu' | 'reviews'>('menu');
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingItem, setPendingItem] = useState<string | null>(null);
 
@@ -37,6 +39,10 @@ export default function RestaurantPage() {
       setMenuItems(resM.data.data);
       const categories = Array.from(new Set(resM.data.data.map((item: MenuItem) => item.category))) as string[];
       if (categories.length > 0) setActiveCategory(categories[0] as string);
+      try {
+        const resReviews = await api.get(`/api/reviews/restaurant/${id}`);
+        setReviews(resReviews.data.data);
+      } catch { /* reviews are optional */ }
     } catch {
       toast.error('Failed to load restaurant');
     } finally {
@@ -121,6 +127,9 @@ export default function RestaurantPage() {
             <div className="flex items-center gap-1">
               <Star size={14} fill="var(--y)" color="var(--y)" />
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{restaurant.rating}</span>
+              {reviews.length > 0 && (
+                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text3)' }}>({reviews.length} reviews)</span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <MapPin size={14} color="var(--text3)" />
@@ -130,72 +139,171 @@ export default function RestaurantPage() {
           </div>
         </div>
 
-        <div className="flex gap-4 mb-6 overflow-x-auto pb-2" style={{ borderBottom: '1.5px solid var(--border2)' }}>
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              style={{
-                padding: '8px 0',
-                fontSize: '13px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                color: activeCategory === cat ? 'var(--y)' : 'var(--text3)',
-                borderBottom: activeCategory === cat ? '2.5px solid var(--y)' : '2.5px solid transparent',
-                background: 'transparent',
-                border: 'none',
-                borderBottomWidth: '2.5px',
-                borderBottomStyle: 'solid',
-                borderBottomColor: activeCategory === cat ? 'var(--y)' : 'transparent',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s',
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="flex gap-6 mb-6" style={{ borderBottom: '1.5px solid var(--border2)' }}>
+          <button
+            onClick={() => setActiveTab('menu')}
+            style={{
+              padding: '8px 0',
+              fontSize: '14px',
+              fontWeight: 700,
+              color: activeTab === 'menu' ? 'var(--y)' : 'var(--text3)',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: `2.5px solid ${activeTab === 'menu' ? 'var(--y)' : 'transparent'}`,
+              cursor: 'pointer',
+            }}
+          >
+            Menu
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            style={{
+              padding: '8px 0',
+              fontSize: '14px',
+              fontWeight: 700,
+              color: activeTab === 'reviews' ? 'var(--y)' : 'var(--text3)',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: `2.5px solid ${activeTab === 'reviews' ? 'var(--y)' : 'transparent'}`,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <MessageSquare size={14} /> Reviews {reviews.length > 0 && `(${reviews.length})`}
+          </button>
         </div>
 
-        <div className="space-y-4 pb-8">
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between p-4"
-              style={{
-                background: 'var(--bg2)',
-                borderRadius: '16px',
-                border: '1.5px solid var(--border2)',
-                transition: 'all 0.2s',
-              }}
-            >
-              <div className="flex-1">
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{item.name}</h3>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)', marginTop: '4px' }}>{item.description}</p>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--y)', marginTop: '8px' }}>${item.price.toFixed(2)}</p>
-              </div>
-              <button
-                onClick={() => handleAddToCart(item.id)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '22px',
-                  background: 'var(--y)',
-                  color: '#000000',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <Plus size={16} /> Add
-              </button>
+        {activeTab === 'menu' && (
+          <>
+            <div className="flex gap-4 mb-6 overflow-x-auto pb-2" style={{ borderBottom: '1.5px solid var(--border2)' }}>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: '8px 0',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    color: activeCategory === cat ? 'var(--y)' : 'var(--text3)',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: `2.5px solid ${activeCategory === cat ? 'var(--y)' : 'transparent'}`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+
+            <div className="space-y-4 pb-8">
+              {filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4"
+                  style={{
+                    background: 'var(--bg2)',
+                    borderRadius: '16px',
+                    border: '1.5px solid var(--border2)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {item.imageUrl && (
+                    <img
+                      src={item.imageUrl.startsWith('http') ? item.imageUrl : `http://localhost:8080${item.imageUrl}`}
+                      alt={item.name}
+                      style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', marginRight: '12px', flexShrink: 0 }}
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>{item.name}</h3>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)', marginTop: '4px' }}>{item.description}</p>
+                    <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--y)', marginTop: '8px' }}>${item.price.toFixed(2)}</p>
+                  </div>
+                  <button
+                    onClick={() => handleAddToCart(item.id)}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '22px',
+                      background: 'var(--y)',
+                      color: '#000000',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <Plus size={16} /> Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {activeTab === 'reviews' && (
+          <div className="space-y-4 pb-8">
+            {reviews.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare size={40} color="var(--text3)" style={{ margin: '0 auto 12px' }} />
+                <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text2)' }}>No reviews yet</p>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text3)', marginTop: '4px' }}>Be the first to review this restaurant!</p>
+              </div>
+            ) : (
+              <>
+                <div className="p-4 rounded-2xl mb-2" style={{ background: 'var(--bg2)', border: '1.5px solid var(--border2)' }}>
+                  <div className="flex items-center gap-3">
+                    <span className="gradient-text" style={{ fontSize: '32px', fontWeight: 700 }}>{restaurant.rating}</span>
+                    <div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star key={s} size={16} fill={s <= Math.round(restaurant.rating) ? 'var(--y)' : 'transparent'} color="var(--y)" />
+                        ))}
+                      </div>
+                      <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text3)', marginTop: '2px' }}>{reviews.length} reviews</p>
+                    </div>
+                  </div>
+                </div>
+                {reviews.map((review) => (
+                  <div key={review.id} className="p-4 rounded-2xl" style={{ background: 'var(--bg2)', border: '1.5px solid var(--border2)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div style={{
+                          width: '32px', height: '32px', borderRadius: '50%',
+                          background: 'var(--y)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 700, fontSize: '14px', color: '#000',
+                        }}>
+                          {review.customerName.charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{review.customerName}</span>
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text3)' }}>
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 mb-2">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star key={s} size={14} fill={s <= review.rating ? 'var(--y)' : 'transparent'} color="var(--y)" />
+                      ))}
+                    </div>
+                    {review.comment && (
+                      <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)' }}>{review.comment}</p>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {showConfirm && (

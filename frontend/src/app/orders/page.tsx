@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import api from '@/lib/axios';
@@ -18,6 +21,8 @@ export default function OrdersPage() {
 function OrdersContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reordering, setReordering] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     fetchOrders();
@@ -31,6 +36,22 @@ function OrdersContent() {
       setOrders([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReorder = async (e: React.MouseEvent, orderId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setReordering(orderId);
+    try {
+      await api.post(`/api/orders/${orderId}/reorder`);
+      toast.success('Items added to cart!');
+      router.push('/cart');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error.response?.data?.message || 'Failed to reorder');
+    } finally {
+      setReordering(null);
     }
   };
 
@@ -106,9 +127,33 @@ function OrdersContent() {
                 <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)' }}>
                   {order.items.length} item{order.items.length > 1 ? 's' : ''}
                 </span>
-                <span className="gradient-text" style={{ fontSize: '16px', fontWeight: 700 }}>
-                  ${order.totalAmount.toFixed(2)}
-                </span>
+                <div className="flex items-center gap-3">
+                  {order.status === 'DELIVERED' && (
+                    <button
+                      onClick={(e) => handleReorder(e, order.id)}
+                      disabled={reordering === order.id}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '20px',
+                        background: 'var(--bg3)',
+                        color: 'var(--y)',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        border: '1.5px solid var(--border2)',
+                        cursor: reordering === order.id ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        opacity: reordering === order.id ? 0.6 : 1,
+                      }}
+                    >
+                      <RefreshCw size={12} /> {reordering === order.id ? 'Adding...' : 'Reorder'}
+                    </button>
+                  )}
+                  <span className="gradient-text" style={{ fontSize: '16px', fontWeight: 700 }}>
+                    ${order.totalAmount.toFixed(2)}
+                  </span>
+                </div>
               </div>
             </Link>
           ))}

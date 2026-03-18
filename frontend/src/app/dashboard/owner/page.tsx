@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, Package, DollarSign, ShoppingBag } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, DollarSign, ShoppingBag, BarChart3 } from 'lucide-react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ImageUpload } from '@/components/ImageUpload';
 import api from '@/lib/axios';
 import { Restaurant, MenuItem, Order } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -27,7 +29,7 @@ function OwnerContent() {
   const [showMenuForm, setShowMenuForm] = useState(false);
   const [showRestaurantForm, setShowRestaurantForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [menuForm, setMenuForm] = useState({ name: '', description: '', price: '', category: '', isAvailable: true });
+  const [menuForm, setMenuForm] = useState({ name: '', description: '', price: '', category: '', imageUrl: '', isAvailable: true });
   const [restForm, setRestForm] = useState({ name: '', description: '', cuisineType: '', address: '', imageUrl: '', isOpen: true });
 
   useEffect(() => {
@@ -78,7 +80,7 @@ function OwnerContent() {
     e.preventDefault();
     if (!selectedRestaurant) return;
     try {
-      const data = { ...menuForm, price: parseFloat(menuForm.price), available: menuForm.isAvailable };
+      const data = { ...menuForm, price: parseFloat(menuForm.price), available: menuForm.isAvailable, imageUrl: menuForm.imageUrl };
       if (editingItem) {
         await api.put(`/api/restaurants/${selectedRestaurant.id}/menu/${editingItem.id}`, data);
         toast.success('Menu item updated!');
@@ -88,7 +90,7 @@ function OwnerContent() {
       }
       setShowMenuForm(false);
       setEditingItem(null);
-      setMenuForm({ name: '', description: '', price: '', category: '', isAvailable: true });
+      setMenuForm({ name: '', description: '', price: '', category: '', imageUrl: '', isAvailable: true });
       const res = await api.get(`/api/restaurants/${selectedRestaurant.id}/menu`);
       setMenuItems(res.data.data);
     } catch {
@@ -139,13 +141,24 @@ function OwnerContent() {
     <div className="max-w-7xl mx-auto px-4 py-8" style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <div className="flex items-center justify-between mb-8">
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)' }}>Restaurant Dashboard</h1>
-        <button
-          onClick={() => setShowRestaurantForm(true)}
-          className="gradient-bg flex items-center gap-2"
-          style={{ padding: '10px 20px', borderRadius: '10px', color: '#000', fontWeight: 700, fontSize: '13px', border: 'none', cursor: 'pointer' }}
-        >
-          <Plus size={16} /> New Restaurant
-        </button>
+        <div className="flex items-center gap-3">
+          {selectedRestaurant && (
+            <Link
+              href={`/dashboard/owner/analytics?id=${selectedRestaurant.id}`}
+              className="flex items-center gap-2"
+              style={{ padding: '10px 20px', borderRadius: '10px', background: 'var(--bg2)', color: 'var(--y)', fontWeight: 700, fontSize: '13px', border: '1.5px solid var(--border2)' }}
+            >
+              <BarChart3 size={16} /> Analytics
+            </Link>
+          )}
+          <button
+            onClick={() => setShowRestaurantForm(true)}
+            className="gradient-bg flex items-center gap-2"
+            style={{ padding: '10px 20px', borderRadius: '10px', color: '#000', fontWeight: 700, fontSize: '13px', border: 'none', cursor: 'pointer' }}
+          >
+            <Plus size={16} /> New Restaurant
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -196,7 +209,7 @@ function OwnerContent() {
         <div className="flex items-center justify-between mb-4">
           <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)' }}>Menu Items</h2>
           <button
-            onClick={() => { setShowMenuForm(true); setEditingItem(null); setMenuForm({ name: '', description: '', price: '', category: '', isAvailable: true }); }}
+            onClick={() => { setShowMenuForm(true); setEditingItem(null); setMenuForm({ name: '', description: '', price: '', category: '', imageUrl: '', isAvailable: true }); }}
             style={{ padding: '8px 16px', borderRadius: '10px', background: 'var(--y)', color: '#000', fontWeight: 700, fontSize: '13px', border: 'none', cursor: 'pointer' }}
           >
             <Plus size={14} style={{ display: 'inline', marginRight: '4px' }} /> Add Item
@@ -227,7 +240,7 @@ function OwnerContent() {
                       <button
                         onClick={() => {
                           setEditingItem(item);
-                          setMenuForm({ name: item.name, description: item.description, price: item.price.toString(), category: item.category, isAvailable: item.isAvailable || item.available });
+                          setMenuForm({ name: item.name, description: item.description, price: item.price.toString(), category: item.category, imageUrl: item.imageUrl || '', isAvailable: item.isAvailable || item.available });
                           setShowMenuForm(true);
                         }}
                         style={{ padding: '6px 12px', borderRadius: '8px', background: 'var(--bg3)', color: 'var(--text)', fontSize: '12px', fontWeight: 600, border: '1.5px solid var(--border2)', cursor: 'pointer' }}
@@ -293,6 +306,10 @@ function OwnerContent() {
               <input value={menuForm.description} onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })} placeholder="Description" required style={inputStyle} />
               <input type="number" step="0.01" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} placeholder="Price" required style={inputStyle} />
               <input value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} placeholder="Category" required style={inputStyle} />
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text3)', marginBottom: '4px', display: 'block' }}>Item Image</label>
+                <ImageUpload currentUrl={menuForm.imageUrl} onUpload={(url) => setMenuForm({ ...menuForm, imageUrl: url })} />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowMenuForm(false); setEditingItem(null); }} style={{ flex: 1, padding: '10px', borderRadius: '10px', background: 'var(--bg3)', color: 'var(--text)', fontWeight: 700, fontSize: '13px', border: '1.5px solid var(--border2)', cursor: 'pointer' }}>
                   Cancel
@@ -315,7 +332,10 @@ function OwnerContent() {
               <input value={restForm.description} onChange={(e) => setRestForm({ ...restForm, description: e.target.value })} placeholder="Description" required style={inputStyle} />
               <input value={restForm.cuisineType} onChange={(e) => setRestForm({ ...restForm, cuisineType: e.target.value })} placeholder="Cuisine Type" required style={inputStyle} />
               <input value={restForm.address} onChange={(e) => setRestForm({ ...restForm, address: e.target.value })} placeholder="Address" required style={inputStyle} />
-              <input value={restForm.imageUrl} onChange={(e) => setRestForm({ ...restForm, imageUrl: e.target.value })} placeholder="Image URL" style={inputStyle} />
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text3)', marginBottom: '4px', display: 'block' }}>Restaurant Image</label>
+                <ImageUpload currentUrl={restForm.imageUrl} onUpload={(url) => setRestForm({ ...restForm, imageUrl: url })} />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowRestaurantForm(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', background: 'var(--bg3)', color: 'var(--text)', fontWeight: 700, fontSize: '13px', border: '1.5px solid var(--border2)', cursor: 'pointer' }}>
                   Cancel

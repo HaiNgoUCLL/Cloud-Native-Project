@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, User, LogOut, ChevronDown, LayoutDashboard } from 'lucide-react';
+import { ShoppingCart, User, LogOut, ChevronDown, LayoutDashboard, Bell } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCartStore } from '@/lib/cartStore';
+import { useNotifications } from '@/lib/useNotifications';
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -15,6 +16,8 @@ export function Navbar() {
   const itemCount = useCartStore((s) => s.itemCount);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { notifications, unreadCount, markAllRead } = useNotifications(!!user);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +117,72 @@ export function Navbar() {
           >
             {isDark ? '☀️' : '🌙'} {isDark ? 'Light' : 'Dark'}
           </button>
+
+          {user && (
+            <div className="relative">
+              <button
+                onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) markAllRead(); }}
+                className="relative flex items-center justify-center"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: '1.5px solid var(--border)',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <Bell size={20} style={{ color: isDark ? 'var(--y)' : '#FFD000' }} />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 flex items-center justify-center"
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#fff',
+                    }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-72 rounded-2xl overflow-hidden"
+                  style={{ background: 'var(--bg2)', border: '1.5px solid var(--border2)', zIndex: 100, maxHeight: '320px', overflowY: 'auto' }}
+                >
+                  <div className="px-4 py-3" style={{ borderBottom: '1.5px solid var(--border2)' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>Notifications</p>
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text3)' }}>No notifications yet</p>
+                    </div>
+                  ) : (
+                    notifications.map((n, i) => (
+                      <div
+                        key={i}
+                        className="px-4 py-3"
+                        style={{
+                          borderBottom: i < notifications.length - 1 ? '1px solid var(--border2)' : 'none',
+                          background: n.read ? 'transparent' : 'var(--bg3)',
+                        }}
+                      >
+                        <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{n.message}</p>
+                        <p style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text3)', marginTop: '2px' }}>
+                          {new Date(n.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {user && user.role === 'CUSTOMER' && (
             <Link

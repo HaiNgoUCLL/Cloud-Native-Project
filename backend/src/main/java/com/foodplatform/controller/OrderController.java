@@ -3,6 +3,7 @@ package com.foodplatform.controller;
 import com.foodplatform.dto.ApiResponse;
 import com.foodplatform.dto.OrderRequest;
 import com.foodplatform.dto.StatusUpdateRequest;
+import com.foodplatform.model.Cart;
 import com.foodplatform.model.Order;
 import com.foodplatform.service.OrderService;
 import jakarta.validation.Valid;
@@ -64,5 +65,13 @@ public class OrderController {
         String customerId = authentication.getName();
         Order order = orderService.cancelOrder(id, customerId);
         return ResponseEntity.ok(ApiResponse.success(order, "Order cancelled"));
+    }
+
+    @PostMapping("/{id}/reorder")
+    public ResponseEntity<ApiResponse<Cart>> reorder(
+            @PathVariable String id, Authentication authentication) {
+        String customerId = authentication.getName();
+        Cart cart = orderService.reorder(id, customerId);
+        return ResponseEntity.ok(ApiResponse.success(cart, "Items added to cart"));
     }
 }

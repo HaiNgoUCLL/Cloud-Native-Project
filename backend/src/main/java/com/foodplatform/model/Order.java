@@ -25,6 +25,8 @@ public class Order {
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
     private String driverId;
+    private String promoCode;
+    private double discountAmount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

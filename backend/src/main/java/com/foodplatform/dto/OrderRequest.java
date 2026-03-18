@@ -16,4 +16,6 @@ public class OrderRequest {
 
     @NotNull(message = "Payment method is required")
     private Order.PaymentMethod paymentMethod;
+
+    private String promoCode;
 }

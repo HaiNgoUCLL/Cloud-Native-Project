@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { Star, RefreshCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { OrderStatusStepper } from '@/components/OrderStatusStepper';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import api from '@/lib/axios';
-import { Order } from '@/types';
+import { Order, Review } from '@/types';
 
 export default function OrderDetailPage() {
   return (
@@ -21,6 +22,11 @@ function OrderDetailContent() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState<Review | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -33,10 +39,36 @@ function OrderDetailContent() {
     try {
       const res = await api.get(`/api/orders/${id}`);
       setOrder(res.data.data);
+      if (res.data.data.status === 'DELIVERED') {
+        try {
+          const revRes = await api.get('/api/reviews/my');
+          const existing = revRes.data.data.find((r: Review) => r.orderId === id);
+          if (existing) setReview(existing);
+        } catch { /* ignore */ }
+      }
     } catch {
       toast.error('Failed to load order');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    setSubmittingReview(true);
+    try {
+      const res = await api.post('/api/reviews', {
+        orderId: id,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      setReview(res.data.data);
+      setShowReviewForm(false);
+      toast.success('Review submitted!');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      toast.error(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -144,7 +176,145 @@ function OrderDetailContent() {
             Pay Now
           </button>
         )}
+        {order.status === 'DELIVERED' && (
+          <button
+            onClick={async () => {
+              try {
+                await api.post(`/api/orders/${id}/reorder`);
+                toast.success('Items added to cart!');
+                router.push('/cart');
+              } catch (err: unknown) {
+                const error = err as { response?: { data?: { message?: string } } };
+                toast.error(error.response?.data?.message || 'Failed to reorder');
+              }
+            }}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '30px',
+              background: 'var(--bg3)',
+              color: 'var(--y)',
+              fontWeight: 700,
+              fontSize: '14px',
+              border: '1.5px solid var(--border2)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <RefreshCw size={16} /> Reorder
+          </button>
+        )}
       </div>
+
+      {order.status === 'DELIVERED' && (
+        <div className="p-6 rounded-2xl mt-6" style={{ background: 'var(--bg2)', border: '1.5px solid var(--border2)' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '12px' }}>
+            {review ? 'Your Review' : 'Rate Your Order'}
+          </h2>
+          {review ? (
+            <div>
+              <div className="flex gap-1 mb-2">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} size={18} fill={s <= review.rating ? 'var(--y)' : 'transparent'} color="var(--y)" />
+                ))}
+              </div>
+              {review.comment && (
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text2)' }}>{review.comment}</p>
+              )}
+              <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text3)', marginTop: '8px' }}>
+                Reviewed on {new Date(review.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          ) : showReviewForm ? (
+            <div>
+              <div className="flex gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setReviewRating(s)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px' }}
+                  >
+                    <Star size={28} fill={s <= reviewRating ? 'var(--y)' : 'transparent'} color="var(--y)" />
+                  </button>
+                ))}
+              </div>
+              <textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Tell us about your experience..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: 'var(--bg3)',
+                  color: 'var(--text)',
+                  border: '1.5px solid var(--border2)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  resize: 'vertical',
+                  marginBottom: '12px',
+                  fontFamily: 'inherit',
+                }}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowReviewForm(false)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    background: 'var(--bg3)',
+                    color: 'var(--text)',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    border: '1.5px solid var(--border2)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={submittingReview}
+                  className="gradient-bg"
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    color: '#000',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    border: 'none',
+                    cursor: submittingReview ? 'not-allowed' : 'pointer',
+                    opacity: submittingReview ? 0.6 : 1,
+                  }}
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowReviewForm(true)}
+              className="gradient-bg"
+              style={{
+                padding: '12px 24px',
+                borderRadius: '30px',
+                color: '#000',
+                fontWeight: 700,
+                fontSize: '14px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Star size={16} /> Leave a Review
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

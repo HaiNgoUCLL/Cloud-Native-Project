@@ -4,6 +4,7 @@ import com.foodplatform.dto.CartRequest;
 import com.foodplatform.dto.CartUpdateRequest;
 import com.foodplatform.model.Cart;
 import com.foodplatform.model.MenuItem;
+import com.foodplatform.model.Order;
 import com.foodplatform.repository.CartRepository;
 import com.foodplatform.repository.MenuItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -90,5 +91,32 @@ public class CartService {
 
     public void clearCart(String customerId) {
         cartRepository.deleteByCustomerId(customerId);
+    }
+
+    public Cart populateFromOrder(String customerId, Order order) {
+        cartRepository.deleteByCustomerId(customerId);
+
+        Cart cart = new Cart();
+        cart.setCustomerId(customerId);
+        cart.setRestaurantId(order.getRestaurantId());
+        cart.setItems(new ArrayList<>());
+
+        for (Order.OrderItem orderItem : order.getItems()) {
+            MenuItem menuItem = menuItemRepository.findById(orderItem.getMenuItemId()).orElse(null);
+            if (menuItem != null && menuItem.isAvailable()) {
+                Cart.CartItem cartItem = new Cart.CartItem();
+                cartItem.setMenuItemId(menuItem.getId());
+                cartItem.setName(menuItem.getName());
+                cartItem.setPrice(menuItem.getPrice());
+                cartItem.setQuantity(orderItem.getQuantity());
+                cart.getItems().add(cartItem);
+            }
+        }
+
+        if (cart.getItems().isEmpty()) {
+            throw new RuntimeException("None of the items from this order are currently available");
+        }
+
+        return cartRepository.save(cart);
     }
 }

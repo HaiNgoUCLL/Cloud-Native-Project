@@ -1,9 +1,11 @@
 package com.foodplatform.config;
 
 import com.foodplatform.model.MenuItem;
+import com.foodplatform.model.PromoCode;
 import com.foodplatform.model.Restaurant;
 import com.foodplatform.model.User;
 import com.foodplatform.repository.MenuItemRepository;
+import com.foodplatform.repository.PromoCodeRepository;
 import com.foodplatform.repository.RestaurantRepository;
 import com.foodplatform.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final RestaurantRepository restaurantRepository;
     private final MenuItemRepository menuItemRepository;
+    private final PromoCodeRepository promoCodeRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -56,6 +59,8 @@ public class DataSeeder implements CommandLineRunner {
         seedMarioMenu(r1.getId());
         seedTokyoMenu(r2.getId());
         seedPrimeCutMenu(r3.getId());
+
+        seedPromoCodes(admin.getId());
 
         log.info("Database seeded successfully!");
     }
@@ -138,6 +143,36 @@ public class DataSeeder implements CommandLineRunner {
         createMenuItem(restaurantId, "Tempura Platter", "Assorted shrimp and vegetable tempura", 17.99, "Hot Dishes", true);
         createMenuItem(restaurantId, "Katsu Curry", "Breaded pork cutlet with Japanese curry and rice", 16.49, "Hot Dishes", true);
         createMenuItem(restaurantId, "Yakitori Set", "Grilled chicken skewers with tare sauce", 13.99, "Hot Dishes", true);
+    }
+
+    private void seedPromoCodes(String adminId) {
+        PromoCode promo1 = new PromoCode();
+        promo1.setCode("WELCOME10");
+        promo1.setDiscountType(PromoCode.DiscountType.PERCENTAGE);
+        promo1.setDiscountValue(10);
+        promo1.setMinimumOrderAmount(15);
+        promo1.setMaxUsageCount(100);
+        promo1.setCurrentUsageCount(0);
+        promo1.setActive(true);
+        promo1.setCreatedBy(adminId);
+        promo1.setExpiresAt(LocalDateTime.now().plusMonths(3));
+        promo1.setCreatedAt(LocalDateTime.now());
+        promoCodeRepository.save(promo1);
+
+        PromoCode promo2 = new PromoCode();
+        promo2.setCode("SAVE5");
+        promo2.setDiscountType(PromoCode.DiscountType.FIXED_AMOUNT);
+        promo2.setDiscountValue(5);
+        promo2.setMinimumOrderAmount(25);
+        promo2.setMaxUsageCount(50);
+        promo2.setCurrentUsageCount(0);
+        promo2.setActive(true);
+        promo2.setCreatedBy(adminId);
+        promo2.setExpiresAt(LocalDateTime.now().plusMonths(1));
+        promo2.setCreatedAt(LocalDateTime.now());
+        promoCodeRepository.save(promo2);
+
+        log.info("Promo codes seeded: WELCOME10 (10% off), SAVE5 ($5 off)");
     }
 
     private void seedPrimeCutMenu(String restaurantId) {

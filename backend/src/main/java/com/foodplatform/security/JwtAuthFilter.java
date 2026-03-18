@@ -23,20 +23,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        String token = null;
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            if (jwtUtil.isTokenValid(token)) {
-                String userId = jwtUtil.extractUserId(token);
-                String role = jwtUtil.extractRole(token);
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userId, null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            token = authHeader.substring(7);
+        } else {
+            // Support token via query parameter (needed for SSE EventSource)
+            String queryToken = request.getParameter("token");
+            if (queryToken != null && !queryToken.isEmpty()) {
+                token = queryToken;
             }
+        }
+
+        if (token != null && jwtUtil.isTokenValid(token)) {
+            String userId = jwtUtil.extractUserId(token);
+            String role = jwtUtil.extractRole(token);
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            userId, null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    );
+            SecurityContextHolder.getContext().setAuthentication(authToken);
         }
 
         filterChain.doFilter(request, response);
