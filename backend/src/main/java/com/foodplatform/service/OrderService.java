@@ -14,7 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,6 +32,8 @@ public class OrderService {
     private final NotificationService notificationService;
     private final PromoCodeService promoCodeService;
     private final CartService cartService;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public Order placeOrder(String customerId, OrderRequest request) {
         Cart cart = cartRepository.findByCustomerId(customerId)
@@ -101,10 +107,14 @@ public class OrderService {
             }
             case DELIVERY_DRIVER -> {
                 List<Order> assigned = orderRepository.findByDriverIdOrderByCreatedAtDesc(userId);
-                if (assigned.isEmpty()) {
-                    yield orderRepository.findByStatusOrderByCreatedAtDesc(Order.OrderStatus.CONFIRMED);
+                List<Order> readyOrders = orderRepository.findByStatusOrderByCreatedAtDesc(Order.OrderStatus.READY);
+                List<Order> combined = new ArrayList<>(assigned);
+                for (Order ro : readyOrders) {
+                    if (combined.stream().noneMatch(o -> o.getId().equals(ro.getId()))) {
+                        combined.add(ro);
+                    }
                 }
-                yield assigned;
+                yield combined;
             }
             case ADMIN -> orderRepository.findAllByOrderByCreatedAtDesc();
         };
@@ -127,10 +137,10 @@ public class OrderService {
                 }
             }
             case DELIVERY_DRIVER -> {
-                if (newStatus == Order.OrderStatus.OUT_FOR_DELIVERY) {
+                if (newStatus == Order.OrderStatus.PICKED_UP) {
                     order.setDriverId(userId);
-                } else if (newStatus != Order.OrderStatus.DELIVERED) {
-                    throw new RuntimeException("Driver can only set out for delivery or delivered");
+                } else if (newStatus != Order.OrderStatus.ARRIVED && newStatus != Order.OrderStatus.DELIVERED) {
+                    throw new RuntimeException("Driver can only pick up, arrive, or deliver");
                 }
             }
             case ADMIN -> { }
@@ -146,15 +156,55 @@ public class OrderService {
         notificationService.sendNotification(saved.getCustomerId(),
             NotificationEvent.orderStatusChanged(saved.getId(), "Your order is now " + statusText));
 
-        // If driver picked up, also notify restaurant owner
-        if (newStatus == Order.OrderStatus.OUT_FOR_DELIVERY) {
+        // If PREPARING, schedule auto-transition to READY after 5 seconds
+        if (newStatus == Order.OrderStatus.PREPARING) {
+            scheduleReadyTransition(saved.getId());
+        }
+
+        // If driver picked up or arrived, notify restaurant owner
+        if (newStatus == Order.OrderStatus.PICKED_UP || newStatus == Order.OrderStatus.ARRIVED) {
+            String action = newStatus == Order.OrderStatus.PICKED_UP ? "picked up by driver" : "driver has arrived";
             restaurantRepository.findById(saved.getRestaurantId()).ifPresent(restaurant ->
                 notificationService.sendNotification(restaurant.getOwnerId(),
-                    NotificationEvent.orderAssigned(saved.getId(), "Order #" + saved.getId().substring(saved.getId().length() - 6) + " picked up by driver"))
+                    NotificationEvent.orderAssigned(saved.getId(), "Order #" + saved.getId().substring(saved.getId().length() - 6) + " " + action))
             );
         }
 
         return saved;
+    }
+
+    private void scheduleReadyTransition(String orderId) {
+        scheduler.schedule(() -> {
+            try {
+                Order order = orderRepository.findById(orderId).orElse(null);
+                if (order == null || order.getStatus() != Order.OrderStatus.PREPARING) {
+                    return;
+                }
+
+                order.setStatus(Order.OrderStatus.READY);
+                order.setUpdatedAt(LocalDateTime.now());
+                orderRepository.save(order);
+
+                // Notify customer
+                notificationService.sendNotification(order.getCustomerId(),
+                    NotificationEvent.orderStatusChanged(orderId, "Your order is ready for pickup!"));
+
+                // Notify restaurant owner
+                restaurantRepository.findById(order.getRestaurantId()).ifPresent(restaurant ->
+                    notificationService.sendNotification(restaurant.getOwnerId(),
+                        NotificationEvent.orderStatusChanged(orderId, "Order #" + orderId.substring(orderId.length() - 6) + " is now ready"))
+                );
+
+                // Notify all drivers
+                List<User> drivers = userRepository.findByRole(User.Role.DELIVERY_DRIVER);
+                for (User driver : drivers) {
+                    notificationService.sendNotification(driver.getId(),
+                        NotificationEvent.orderReady(orderId, "Order #" + orderId.substring(orderId.length() - 6) + " is ready for pickup"));
+                }
+            } catch (Exception e) {
+                // Log but don't throw — this runs on a background thread
+            }
+        }, 5, TimeUnit.SECONDS);
     }
 
     public Order simulatePayment(String orderId, String customerId) {

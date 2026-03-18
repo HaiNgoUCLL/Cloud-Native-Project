@@ -19,7 +19,6 @@ class NotificationServiceTest {
     @Test
     void subscribe_createsEmitter() {
         SseEmitter emitter = notificationService.subscribe("user1");
-
         assertThat(emitter).isNotNull();
     }
 
@@ -28,7 +27,6 @@ class NotificationServiceTest {
         SseEmitter emitter = notificationService.subscribe("user1");
         NotificationEvent event = NotificationEvent.newOrder("order1", "New order received");
 
-        // Should not throw — message delivered to connected emitter
         assertThatCode(() -> notificationService.sendNotification("user1", event))
                 .doesNotThrowAnyException();
     }
@@ -37,7 +35,6 @@ class NotificationServiceTest {
     void sendNotification_noConnection_noop() {
         NotificationEvent event = NotificationEvent.orderStatusChanged("order1", "Order confirmed");
 
-        // Should not throw even when no user is subscribed
         assertThatCode(() -> notificationService.sendNotification("nonexistentUser", event))
                 .doesNotThrowAnyException();
     }
@@ -63,5 +60,14 @@ class NotificationServiceTest {
 
         assertThat(statusChanged.getType()).isEqualTo(NotificationEvent.Type.ORDER_STATUS_CHANGED);
         assertThat(assigned.getType()).isEqualTo(NotificationEvent.Type.ORDER_ASSIGNED);
+    }
+
+    @Test
+    void notificationEvent_orderReady_createsCorrectType() {
+        NotificationEvent ready = NotificationEvent.orderReady("o4", "Order ready");
+
+        assertThat(ready.getType()).isEqualTo(NotificationEvent.Type.ORDER_READY);
+        assertThat(ready.getOrderId()).isEqualTo("o4");
+        assertThat(ready.getMessage()).isEqualTo("Order ready");
     }
 }

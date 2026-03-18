@@ -65,7 +65,7 @@ export interface OrderItem {
   quantity: number;
 }
 
-export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP' | 'ARRIVED' | 'DELIVERED' | 'CANCELLED';
 export type PaymentStatus = 'PENDING' | 'SIMULATED_PAID' | 'FAILED';
 export type PaymentMethod = 'CREDIT_CARD' | 'PAYPAL' | 'CASH';
 

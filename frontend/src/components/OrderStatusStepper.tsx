@@ -7,7 +7,9 @@ const STEPS: { status: OrderStatus; label: string }[] = [
   { status: 'PENDING', label: 'Pending' },
   { status: 'CONFIRMED', label: 'Confirmed' },
   { status: 'PREPARING', label: 'Preparing' },
-  { status: 'OUT_FOR_DELIVERY', label: 'On the way' },
+  { status: 'READY', label: 'Ready' },
+  { status: 'PICKED_UP', label: 'Picked Up' },
+  { status: 'ARRIVED', label: 'Arrived' },
   { status: 'DELIVERED', label: 'Delivered' },
 ];
 

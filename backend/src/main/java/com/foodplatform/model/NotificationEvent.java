@@ -14,7 +14,8 @@ public class NotificationEvent {
     public enum Type {
         ORDER_STATUS_CHANGED,
         NEW_ORDER,
-        ORDER_ASSIGNED
+        ORDER_ASSIGNED,
+        ORDER_READY
     }
 
     private Type type;
@@ -32,5 +33,9 @@ public class NotificationEvent {
 
     public static NotificationEvent orderAssigned(String orderId, String message) {
         return new NotificationEvent(Type.ORDER_ASSIGNED, orderId, message, LocalDateTime.now());
+    }
+
+    public static NotificationEvent orderReady(String orderId, String message) {
+        return new NotificationEvent(Type.ORDER_READY, orderId, message, LocalDateTime.now());
     }
 }

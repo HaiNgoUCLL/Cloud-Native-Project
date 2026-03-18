@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,7 +102,7 @@ class OrderServiceTest {
         assertThat(result.getCustomerId()).isEqualTo("cust1");
         assertThat(result.getRestaurantId()).isEqualTo("rest1");
         assertThat(result.getStatus()).isEqualTo(Order.OrderStatus.PENDING);
-        assertThat(result.getTotalAmount()).isEqualTo(45.97); // 14.99*2 + 15.99
+        assertThat(result.getTotalAmount()).isEqualTo(45.97);
         assertThat(result.getDeliveryAddress()).isEqualTo("456 Oak Ave");
         verify(cartRepository).deleteByCustomerId("cust1");
         verify(notificationService).sendNotification(eq("owner1"), any(NotificationEvent.class));
@@ -133,7 +134,7 @@ class OrderServiceTest {
 
         assertThat(result.getPromoCode()).isEqualTo("WELCOME10");
         assertThat(result.getDiscountAmount()).isEqualTo(4.60);
-        assertThat(result.getTotalAmount()).isEqualTo(41.37); // 45.97 - 4.60
+        assertThat(result.getTotalAmount()).isEqualTo(41.37);
         verify(promoCodeService).applyPromoCode("WELCOME10");
     }
 
@@ -162,6 +163,18 @@ class OrderServiceTest {
     }
 
     @Test
+    void updateStatus_ownerPreparing_schedulesReady() {
+        pendingOrder.setStatus(Order.OrderStatus.CONFIRMED);
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
+        when(userRepository.findById("owner1")).thenReturn(Optional.of(owner));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        Order result = orderService.updateOrderStatus("order1", Order.OrderStatus.PREPARING, "owner1");
+
+        assertThat(result.getStatus()).isEqualTo(Order.OrderStatus.PREPARING);
+    }
+
+    @Test
     void updateStatus_ownerInvalidStatus_throws() {
         when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
         when(userRepository.findById("owner1")).thenReturn(Optional.of(owner));
@@ -172,17 +185,52 @@ class OrderServiceTest {
     }
 
     @Test
-    void updateStatus_driverOutForDelivery_setsDriverId() {
-        pendingOrder.setStatus(Order.OrderStatus.PREPARING);
+    void updateStatus_driverPickedUp_setsDriverId() {
+        pendingOrder.setStatus(Order.OrderStatus.READY);
         when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
         when(userRepository.findById("driver1")).thenReturn(Optional.of(driver));
         when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
         when(restaurantRepository.findById("rest1")).thenReturn(Optional.of(restaurant));
 
-        Order result = orderService.updateOrderStatus("order1", Order.OrderStatus.OUT_FOR_DELIVERY, "driver1");
+        Order result = orderService.updateOrderStatus("order1", Order.OrderStatus.PICKED_UP, "driver1");
 
-        assertThat(result.getStatus()).isEqualTo(Order.OrderStatus.OUT_FOR_DELIVERY);
+        assertThat(result.getStatus()).isEqualTo(Order.OrderStatus.PICKED_UP);
         assertThat(result.getDriverId()).isEqualTo("driver1");
+    }
+
+    @Test
+    void updateStatus_driverArrived_success() {
+        pendingOrder.setStatus(Order.OrderStatus.PICKED_UP);
+        pendingOrder.setDriverId("driver1");
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
+        when(userRepository.findById("driver1")).thenReturn(Optional.of(driver));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+        when(restaurantRepository.findById("rest1")).thenReturn(Optional.of(restaurant));
+
+        Order result = orderService.updateOrderStatus("order1", Order.OrderStatus.ARRIVED, "driver1");
+
+        assertThat(result.getStatus()).isEqualTo(Order.OrderStatus.ARRIVED);
+    }
+
+    @Test
+    void updateStatus_driverInvalidStatus_throws() {
+        pendingOrder.setStatus(Order.OrderStatus.READY);
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
+        when(userRepository.findById("driver1")).thenReturn(Optional.of(driver));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus("order1", Order.OrderStatus.CONFIRMED, "driver1"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Driver can only pick up, arrive, or deliver");
+    }
+
+    @Test
+    void updateStatus_customerNotAuthorized_throws() {
+        when(orderRepository.findById("order1")).thenReturn(Optional.of(pendingOrder));
+        when(userRepository.findById("cust1")).thenReturn(Optional.of(customer));
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus("order1", Order.OrderStatus.CONFIRMED, "cust1"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Not authorized to update order status");
     }
 
     @Test
@@ -213,5 +261,22 @@ class OrderServiceTest {
         Order result = orderService.simulatePayment("order1", "cust1");
 
         assertThat(result.getPaymentStatus()).isEqualTo(Order.PaymentStatus.SIMULATED_PAID);
+    }
+
+    @Test
+    void getOrders_forDriver_includesReadyOrders() {
+        Order readyOrder = new Order();
+        readyOrder.setId("order2");
+        readyOrder.setStatus(Order.OrderStatus.READY);
+
+        when(userRepository.findById("driver1")).thenReturn(Optional.of(driver));
+        when(orderRepository.findByDriverIdOrderByCreatedAtDesc("driver1")).thenReturn(new ArrayList<>());
+        when(orderRepository.findByStatusOrderByCreatedAtDesc(Order.OrderStatus.READY))
+                .thenReturn(List.of(readyOrder));
+
+        List<Order> result = orderService.getOrders("driver1");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getStatus()).isEqualTo(Order.OrderStatus.READY);
     }
 }

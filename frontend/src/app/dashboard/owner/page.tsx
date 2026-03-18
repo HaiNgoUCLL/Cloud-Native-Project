@@ -31,6 +31,7 @@ function OwnerContent() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [menuForm, setMenuForm] = useState({ name: '', description: '', price: '', category: '', imageUrl: '', isAvailable: true });
   const [restForm, setRestForm] = useState({ name: '', description: '', cuisineType: '', address: '', imageUrl: '', isOpen: true });
+  const [preparingOrders, setPreparingOrders] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -113,6 +114,17 @@ function OwnerContent() {
     try {
       await api.put(`/api/orders/${orderId}/status`, { status });
       toast.success('Order status updated');
+      if (status === 'PREPARING') {
+        setPreparingOrders((prev) => new Set(prev).add(orderId));
+        setTimeout(() => {
+          setPreparingOrders((prev) => {
+            const next = new Set(prev);
+            next.delete(orderId);
+            return next;
+          });
+          fetchData();
+        }, 6000);
+      }
       const res = await api.get('/api/orders');
       setOrders(res.data.data);
     } catch (err: unknown) {
@@ -272,7 +284,14 @@ function OwnerContent() {
                 <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text3)' }}>{order.items.length} items • ${order.totalAmount.toFixed(2)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--y)' }}>{order.status.replace('_', ' ')}</span>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: order.status === 'READY' ? '#22c55e' : 'var(--y)',
+                  ...(preparingOrders.has(order.id) ? { animation: 'pulse 1s infinite' } : {}),
+                }}>
+                  {preparingOrders.has(order.id) ? '⏳ Preparing...' : order.status === 'READY' ? '✅ READY' : order.status.replace('_', ' ')}
+                </span>
                 {order.status === 'PENDING' && (
                   <button
                     onClick={() => handleUpdateOrderStatus(order.id, 'CONFIRMED')}

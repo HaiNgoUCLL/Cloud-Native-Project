@@ -41,7 +41,7 @@ public class Order {
     }
 
     public enum OrderStatus {
-        PENDING, CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
+        PENDING, CONFIRMED, PREPARING, READY, PICKED_UP, ARRIVED, DELIVERED, CANCELLED
     }
 
     public enum PaymentStatus {
