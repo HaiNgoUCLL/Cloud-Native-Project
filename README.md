@@ -1,3 +1,4 @@
+Part 1 - Start point
 # Online Food Ordering and Delivery Platform
 
 A full-stack cloud-native food ordering and delivery platform built as a university project. Features real-time order tracking with SSE notifications, role-based dashboards for customers, restaurant owners, and delivery drivers, and a modern dark/light theme UI.
