@@ -273,7 +273,7 @@ export const mockOrders: Order[] = [
     items: [
       { menuItemId: 'm4', name: 'Salmon Nigiri (6pc)', price: 16.99, quantity: 2 },
     ],
-    status: 'OUT_FOR_DELIVERY',
+    status: 'PICKED_UP',
     totalAmount: 33.98,
     deliveryAddress: '456 Oak Ave, Apt 2B',
     paymentStatus: 'SIMULATED_PAID',
