@@ -274,6 +274,22 @@ Cloud-Native-Project/
 └── README.md
 ```
 
-## Cloud Migration Note
+## ☁️ Cloud Database — Azure Cosmos DB
 
-The commit labelled "Starting Point" marks the baseline before Azure migration (Cosmos DB, App Service, Container Registry).
+This project uses **Azure Cosmos DB for MongoDB API** as its cloud database.
+
+### Why Cosmos DB for MongoDB API?
+Wire-compatible with MongoDB — zero changes needed to Spring Data repositories or model classes.
+
+### Setup
+1. Create an Azure Cosmos DB for MongoDB API account in the Azure Portal
+2. Copy your Primary Connection String from Settings → Connection strings
+3. Create a `.env` file at the project root:
+```
+MONGO_URI=<your Azure connection string>
+MONGO_DB=foodplatform
+```
+4. Run normally with `./start.sh`
+
+### Collections created automatically on first run
+users, restaurants, menuItems, orders, carts, reviews

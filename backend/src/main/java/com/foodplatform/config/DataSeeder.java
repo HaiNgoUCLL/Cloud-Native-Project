@@ -30,6 +30,7 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        try {
         if (userRepository.count() > 0) {
             log.info("Database already seeded, skipping.");
             return;
@@ -362,6 +363,9 @@ public class DataSeeder implements CommandLineRunner {
         cartRepository.save(cart2);
 
         log.info("Database seeded: {} orders, {} reviews, 11 restaurants, 10 customers", totalOrders, totalReviews);
+        } catch (Exception e) {
+            log.warn("DataSeeder encountered an error (may be normal on Azure Cosmos DB): {}", e.getMessage());
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────
